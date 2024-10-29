@@ -2,13 +2,16 @@
 
 ## Overview
 
-This PowerShell script generates a report of active users in Active Directory, displaying their password expiration statuses along with their top-level Organizational Unit (OU). It sorts users whose passwords never expire at the top, followed by those with upcoming password expirations. Additionally, it offers the option to export the report to a CSV file for further analysis.
+This PowerShell script generates a report of active users in Active Directory, displaying their password expiration statuses along with their top-level Organizational Unit (OU). It sorts users whose passwords never expire at the top, followed by those with upcoming password expirations. Additionally, it offers options to filter the report by a specific OU or AD group and the ability to export the report to a CSV file for further analysis.
 
 ## Features
 
 - **Active Users Retrieval:** Lists all enabled users in Active Directory.
 - **Password Expiry Calculation:** Shows when each user's password is set to expire based on the domain's password policy.
 - **Top-Level OU Display:** Indicates the primary OU each user belongs to.
+- **Filtering Options:**
+  - **By Organizational Unit (OU):** Generate reports for users within a specific OU.
+  - **By AD Group:** Generate reports for users within a specific AD group.
 - **Sorting Mechanism:** Prioritizes users with non-expiring passwords, then sorts by nearest expiration dates.
 - **Export Capability:** Option to export the report to a CSV file.
 

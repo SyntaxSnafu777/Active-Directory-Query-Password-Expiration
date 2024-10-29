@@ -35,24 +35,149 @@ function Get-TopLevelOU {
     }
 }
 
-# Retrieve all enabled users with necessary properties
-try {
-    $UserList = Get-ADUser -Filter {Enabled -eq $True} -Properties PasswordLastSet, PasswordNeverExpires, DistinguishedName -ErrorAction Stop | 
-        Select-Object Name, SamAccountName, DistinguishedName,
-            @{Name='TopLevelOU'; Expression={ Get-TopLevelOU $_.DistinguishedName }},
-            @{Name='PasswordLastSet'; Expression={$_.PasswordLastSet}},
-            @{Name='PasswordExpiryDate'; Expression={
-                if ($_.PasswordNeverExpires) {
-                    $null  # Use $null for 'Never' to facilitate sorting
-                }
-                else {
-                    $_.PasswordLastSet + $MaxPasswordAge
-                }
-            }}
+# Initialize an empty array for users
+$UserList = @()
+
+# Inform the user about the script's options
+Write-Host ""
+Write-Host "This script will check password expiration for Active Directory users." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "You have the following options to filter users:" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Check a specific Organizational Unit (OU)" -ForegroundColor Cyan
+Write-Host "Check a specific Active Directory (AD) Group" -ForegroundColor Cyan
+Write-Host "Check all active accounts in AD" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Please make your selections below:" -ForegroundColor Yellow
+Write-Host ""
+
+# Prompt the user to decide whether to check a specific OU
+$checkOU = Read-Host "Would you like to check a specific Organizational Unit (OU)? (Y/N)"
+Write-Host ""
+
+if ($checkOU.Trim().ToUpper() -eq 'Y') {
+    # Prompt for the OU name
+    $ouInput = Read-Host "Enter the distinguished name of the OU (e.g., OU=Marketing,DC=contoso,DC=com)"
+
+    # Attempt to retrieve the OU
+    try {
+        $OU = Get-ADOrganizationalUnit -Filter { DistinguishedName -eq $ouInput } -ErrorAction Stop
+    }
+    catch {
+        Write-Host "Failed to find the OU with distinguished name '$ouInput'. Please ensure the format is correct." -ForegroundColor Red
+        exit
+    }
+
+    # Retrieve all enabled users within the specified OU
+    try {
+        $UserList = Get-ADUser -Filter { Enabled -eq $True } -SearchBase $OU.DistinguishedName -Properties PasswordLastSet, PasswordNeverExpires, DistinguishedName -ErrorAction Stop | 
+            Select-Object Name, SamAccountName, DistinguishedName,
+                @{Name='TopLevelOU'; Expression={ Get-TopLevelOU $_.DistinguishedName }},
+                @{Name='PasswordLastSet'; Expression={$_.PasswordLastSet}},
+                @{Name='PasswordExpiryDate'; Expression={
+                    if ($_.PasswordNeverExpires) {
+                        $null  # Use $null for 'Never' to facilitate sorting
+                    }
+                    else {
+                        $_.PasswordLastSet + $MaxPasswordAge
+                    }
+                }}
+        
+        if ($UserList.Count -eq 0) {
+            Write-Host "No enabled users found in the OU '$ouInput'." -ForegroundColor Yellow
+            exit
+        }
+
+        Write-Host "Retrieved users from OU '$ouInput'." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Failed to retrieve users from the OU '$ouInput'. Ensure you have the necessary permissions." -ForegroundColor Red
+        exit
+    }
 }
-catch {
-    Write-Host "Failed to retrieve user list. Check your Active Directory connectivity and permissions." -ForegroundColor Red
-    exit
+else {
+    # Prompt the user to decide whether to check a specific AD group
+    $checkGroup = Read-Host "Would you like to check a specific AD group? (Y/N)"
+
+    if ($checkGroup.Trim().ToUpper() -eq 'Y') {
+        # Prompt for the group name
+        $groupInput = Read-Host "Enter the AD group name in 'DOMAIN\GroupName' format (e.g., CONTOSO\Marketing Users)"
+
+        # Attempt to parse the input into Domain and Name
+        if ($groupInput -match "^(?<Domain>[^\\]+)\\(?<Name>.+)$") {
+            $Domain = $matches['Domain']
+            $GroupName = $matches['Name']
+        }
+        else {
+            Write-Host "Invalid format. Please enter in 'DOMAIN\GroupName' format." -ForegroundColor Red
+            exit
+        }
+
+        # Try to get the group first
+        try {
+            $Group = Get-ADGroup -Identity $GroupName -Server $Domain -ErrorAction Stop
+            # If it's a group, get all enabled members
+            try {
+                $GroupMembers = Get-ADGroupMember -Identity $Group -Recursive -ErrorAction Stop | 
+                    Where-Object { $_.objectClass -eq 'user' } | 
+                    Get-ADUser -Properties PasswordLastSet, PasswordNeverExpires, DistinguishedName -ErrorAction Stop |
+                    Where-Object { $_.Enabled -eq $True }
+                
+                if ($GroupMembers.Count -eq 0) {
+                    Write-Host "The group '$groupInput' has no enabled user members." -ForegroundColor Yellow
+                    exit
+                }
+
+                # Assign to UserList
+                $UserList = $GroupMembers | Select-Object Name, SamAccountName, DistinguishedName,
+                    @{Name='TopLevelOU'; Expression={ Get-TopLevelOU $_.DistinguishedName }},
+                    @{Name='PasswordLastSet'; Expression={$_.PasswordLastSet}},
+                    @{Name='PasswordExpiryDate'; Expression={
+                        if ($_.PasswordNeverExpires) {
+                            $null  # Use $null for 'Never' to facilitate sorting
+                        }
+                        else {
+                            $_.PasswordLastSet + $MaxPasswordAge
+                        }
+                    }}
+
+                Write-Host "Retrieved users from group '$groupInput'." -ForegroundColor Green
+            }
+            catch {
+                Write-Host "Failed to retrieve members of group '$groupInput'. Ensure you have the necessary permissions." -ForegroundColor Red
+                exit
+            }
+        }
+        catch {
+            Write-Host "The group '$groupInput' does not exist in the domain '$Domain'." -ForegroundColor Red
+            exit
+        }
+    }
+    elseif ($checkGroup.Trim().ToUpper() -eq 'N') {
+        # Proceed to retrieve all enabled users as in the original script
+        try {
+            $UserList = Get-ADUser -Filter {Enabled -eq $True} -Properties PasswordLastSet, PasswordNeverExpires, DistinguishedName -ErrorAction Stop | 
+                Select-Object Name, SamAccountName, DistinguishedName,
+                    @{Name='TopLevelOU'; Expression={ Get-TopLevelOU $_.DistinguishedName }},
+                    @{Name='PasswordLastSet'; Expression={$_.PasswordLastSet}},
+                    @{Name='PasswordExpiryDate'; Expression={
+                        if ($_.PasswordNeverExpires) {
+                            $null  # Use $null for 'Never' to facilitate sorting
+                        }
+                        else {
+                            $_.PasswordLastSet + $MaxPasswordAge
+                        }
+                    }}
+        }
+        catch {
+            Write-Host "Failed to retrieve user list. Check your Active Directory connectivity and permissions." -ForegroundColor Red
+            exit
+        }
+    }
+    else {
+        Write-Host "Invalid input. Please enter 'Y' or 'N'." -ForegroundColor Red
+        exit
+    }
 }
 
 # Sort the list:
