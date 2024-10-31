@@ -97,6 +97,7 @@ if ($checkOU.Trim().ToUpper() -eq 'Y') {
 }
 else {
     # Prompt the user to decide whether to check a specific AD group
+    Write-Host ""
     $checkGroup = Read-Host "Would you like to check a specific AD group? (Y/N)"
 
     if ($checkGroup.Trim().ToUpper() -eq 'Y') {
