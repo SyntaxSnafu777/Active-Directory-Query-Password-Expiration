@@ -57,6 +57,7 @@ Write-Host ""
 
 if ($checkOU.Trim().ToUpper() -eq 'Y') {
     # Prompt for the OU name
+	Write-Host ""
     $ouInput = Read-Host "Enter the distinguished name of the OU (e.g., OU=Marketing,DC=contoso,DC=com)"
 
     # Attempt to retrieve the OU
@@ -102,6 +103,7 @@ else {
 
     if ($checkGroup.Trim().ToUpper() -eq 'Y') {
         # Prompt for the group name
+		Write-Host ""
         $groupInput = Read-Host "Enter the AD group name in 'DOMAIN\GroupName' format (e.g., CONTOSO\Marketing Users)"
 
         # Attempt to parse the input into Domain and Name
