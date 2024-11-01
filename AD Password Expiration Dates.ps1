@@ -100,10 +100,10 @@ else {
     # Prompt the user to decide whether to check a specific AD group
     Write-Host ""
     $checkGroup = Read-Host "Would you like to check a specific AD group? (Y/N)"
+	Write-Host ""
 
     if ($checkGroup.Trim().ToUpper() -eq 'Y') {
         # Prompt for the group name
-		Write-Host ""
         $groupInput = Read-Host "Enter the AD group name in 'DOMAIN\GroupName' format (e.g., CONTOSO\Marketing Users)"
 
         # Attempt to parse the input into Domain and Name
